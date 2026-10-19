@@ -1,0 +1,5 @@
+# Register the honey-token guard. The plugin attaches to the `llm/stream`
+# waterfall and the tool pipeline, so it injects the `llm` service.
+- insert:
+    - id: honey-guard
+      name: dsh-honey-guard

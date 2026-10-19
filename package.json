@@ -1,0 +1,74 @@
+{
+  "name": "dsh-honey-guard",
+  "displayName": "DSH Honey Guard",
+  "description": "Zero-Leak Honey-Token Guard for DeepSeek Harness — 双向可还原的蜜罐映射层：出站把本地密钥替换为结构合法且可唯一映射的 Honey-Token，入站再无缝还原为真实值。",
+  "version": "0.1.0",
+  "author": "elegant01",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "deepseek",
+    "security",
+    "dlp",
+    "secret",
+    "redaction",
+    "honey-token"
+  ],
+  "type": "module",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "main": "lib/index.mjs",
+  "types": "lib/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.mts",
+      "default": "./lib/index.mjs"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elegant01/dsh-honey-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/elegant01/dsh-honey-guard/issues"
+  },
+  "homepage": "https://github.com/elegant01/dsh-honey-guard#readme",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0",
+    "@deepseek-ai/schemastery": "^3.18.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/dsh-agent-loop": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@deepseek-ai/schemastery": "^3.18.4",
+    "@types/node": "^22.20.4",
+    "tsdown": "^0.22.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.8"
+  }
+}
