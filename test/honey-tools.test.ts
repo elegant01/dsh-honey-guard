@@ -310,3 +310,65 @@ describe('restore round-trip through the guard pipeline', () => {
     expect(again).toContain(fake)
   })
 })
+
+describe('host JSON Schema subset', () => {
+  // Mirrors the host registry verbatim (CONSTRAINT_KEYWORDS + ANNOTATION_KEYWORDS
+  // in dsh-desktop): anything outside this makes the whole plugin fail to activate.
+  const SUPPORTED = new Set([
+    'type',
+    'oneOf',
+    'properties',
+    'required',
+    'additionalProperties',
+    'items',
+    'enum',
+    'const',
+    'description',
+    'title',
+    'default',
+    'examples',
+  ])
+
+  function keywordsOf(schema: unknown, into: string[] = []): string[] {
+    if (Array.isArray(schema)) {
+      for (const entry of schema) keywordsOf(entry, into)
+      return into
+    }
+    if (!schema || typeof schema !== 'object') return into
+    for (const [key, value] of Object.entries(schema as Record<string, unknown>)) {
+      into.push(key)
+      if (key === 'properties') {
+        // The keys here are property names, not keywords, so walk only the values.
+        for (const child of Object.values((value ?? {}) as Record<string, unknown>)) keywordsOf(child, into)
+      } else if (key === 'items') {
+        keywordsOf(value, into)
+      }
+      // enum/const carry data, not subschemas.
+    }
+    return into
+  }
+
+  it('uses only supported keywords in every tool parameters/output schema', () => {
+    const engine = new HoneyEngine({ seed: 's' } as never)
+    const tools = [
+      createHoneyMarkTool({ engine, scopeKeyFor: () => 'agent-1' }),
+      createHoneyRestoreTool({ engine, scopeKeyFor: () => 'agent-1' }),
+      createHoneyStatsTool({ engine, scopeKeyFor: () => 'agent-1' }),
+    ]
+    for (const tool of tools) {
+      const used = [...keywordsOf(tool.parameters), ...keywordsOf((tool.output as { schema: unknown }).schema)]
+      expect(used.filter((k) => !SUPPORTED.has(k))).toEqual([])
+    }
+  })
+
+  it('flags a numeric or array bound as unsupported', () => {
+    const offending = {
+      type: 'object',
+      properties: {
+        values: { type: 'array', items: { type: 'string' }, minItems: 1 },
+        marked: { type: 'integer', minimum: 0 },
+      },
+    }
+    expect(keywordsOf(offending).filter((k) => !SUPPORTED.has(k))).toEqual(['minItems', 'minimum'])
+  })
+})

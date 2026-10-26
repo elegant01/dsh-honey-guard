@@ -43,11 +43,15 @@ export const HONEY_MARK_NAME = 'honey_mark'
 export const HONEY_RESTORE_NAME = 'honey_restore'
 export const HONEY_STATS_NAME = 'honey_stats'
 
+/**
+ * The host registry only accepts type/oneOf/properties/required/additionalProperties/
+ * items/enum/const + annotations; any other keyword (`minimum`, `minItems`) fails the
+ * whole plugin at activation, so range checks live in `execute()` instead.
+ */
 /** Shared JSON Schema for the `values` argument used by mark/restore. */
 const VALUES_ARGUMENT = {
   type: 'array',
   items: { type: 'string' },
-  minItems: 1,
   description: 'One or more literal values',
 } as const
 
@@ -70,14 +74,14 @@ const RESTORE_ARGUMENTS_SCHEMA = {
 /** Canonical output of `honey_mark`: a value-free count. */
 const MARK_OUTPUT_SCHEMA = {
   type: 'object',
-  properties: { marked: { type: 'integer', minimum: 0 } },
+  properties: { marked: { type: 'integer' } },
   required: ['marked'],
 } as const
 
 /** Canonical output of `honey_restore`: a value-free count. */
 const RESTORE_OUTPUT_SCHEMA = {
   type: 'object',
-  properties: { restored: { type: 'integer', minimum: 0 } },
+  properties: { restored: { type: 'integer' } },
   required: ['restored'],
 } as const
 
@@ -85,11 +89,11 @@ const RESTORE_OUTPUT_SCHEMA = {
 const STATS_OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
-    mapped: { type: 'integer', minimum: 0 },
-    substituted: { type: 'integer', minimum: 0 },
-    restored: { type: 'integer', minimum: 0 },
-    canaries: { type: 'integer', minimum: 0 },
-    canaryHits: { type: 'integer', minimum: 0 },
+    mapped: { type: 'integer' },
+    substituted: { type: 'integer' },
+    restored: { type: 'integer' },
+    canaries: { type: 'integer' },
+    canaryHits: { type: 'integer' },
   },
   required: ['mapped', 'substituted', 'restored', 'canaries', 'canaryHits'],
 } as const
