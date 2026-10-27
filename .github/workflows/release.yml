@@ -1,0 +1,72 @@
+name: Publish Package
+
+# 发布 npm 包：用 npm Trusted Publisher（OIDC）发布 dsh-honey-guard，免 token、免 OTP。
+# 触发：推送到 main（版本号在 npm 上还不存在就发）、GitHub Release 发布、手动 workflow_dispatch。
+#
+# 前置（一次性，npm 网页上配，要按一次 Security key）：
+#   dsh-honey-guard 包页 → Publishing → Trusted Publisher → GitHub Actions
+#   Organization or repository:  elegant01/dsh-honey-guard
+#   Workflow name (filename):     release.yml
+#   Environment name:             （留空）
+#   Git tag to release from:      （留空）
+#
+# 以后的发版流程：npm version patch --no-git-tag-version && git push —— CI 自动构建并发布。
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# 两条 push 同时跑会撞车（npm 只允许同一版本发一次），排队。
+concurrency:
+  group: publish-npmjs
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+
+  publish-npmjs:
+    name: Publish to npmjs (OIDC)
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC 必需
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          # 注意：不设 registry-url —— OIDC 握手由 npm CLI 自动完成，
+          # 显式 .npmrc 认证反而会干扰 trusted publisher 流程。
+          node-version: '24' # 内置 npm >= 11，满足 OIDC/trusted publishing 要求
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - name: Skip when this version is already on npm
+        id: needs-publish
+        env:
+          PKG: dsh-honey-guard
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "$PKG@$version" version --registry https://registry.npmjs.org >/dev/null 2>&1; then
+            echo "npm already has $PKG@$version — nothing to publish"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "will publish $PKG@$version"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish with provenance
+        if: steps.needs-publish.outputs.skip == 'false'
+        run: npm publish --provenance --access public
