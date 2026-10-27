@@ -28,6 +28,28 @@
 
 另有 **Canary Trap**：每个会话惰性注册一个永不参与替换的"死蜜罐"，在其他会话的文本里出现即告警——说明有记录被跨会话搬运。
 
+## 日志
+
+默认只走 `ctx.logger`：dsh-desktop 对 `info` 级没有任何 UI 或文件出口，只有 `warn`（金丝雀命中、装配失败）会以系统通知弹出。想在机器上留下逐条记录，打开落盘开关：
+
+```yaml
+# ~/.dsh/profiles/desktop/cordis.patch.yml
+- id: honey-guard
+  name: dsh-honey-guard
+  config:
+    logFile: true
+    logFileMaxMb: 5   # 超过这个大小滚一份 .1
+```
+
+之后每次替换都会往 `~/.dsh/honey-guard/substitutions.jsonl` 追加一行 JSON：
+
+```json
+{"time":"2026-10-27T01:00:00.000Z","surface":"pre-step","total":2,"hits":{"openai_key":1,"custom":1}}
+{"time":"2026-10-27T01:00:03.000Z","surface":"tool ops_bash","canary":"AKIA…","sourceScope":"agent-1","currentScope":"agent-2"}
+```
+
+字段只有 surface、类别计数和金丝雀 id——**真实值与蜜罐全文都不写**，与日志同一条值安全约定。插件启动时另写一行 `"surface":"activate"`，用来证明这一轮它确实被装配上了。目录不可写时落盘静默停用，不影响脱敏本身。
+
 ## 安装
 
 ```powershell

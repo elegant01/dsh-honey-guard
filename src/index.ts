@@ -51,6 +51,7 @@ import { CanaryTracker, type CanaryHit } from './canary.ts'
 import { sanitizeBlocks, sanitizeMessages, type SanitizeReport } from './outbound.ts'
 import { createTextRestorer, restoreBlocks, restoreMessages, restoreText } from './restore.ts'
 import { registerHoneyTools } from './honey-tools.ts'
+import { createSubLog } from './sub-log.ts'
 import type { HoneyCategory } from './types.ts'
 import type { RestorationEvent } from './honey-engine.ts'
 
@@ -87,6 +88,10 @@ export interface Config {
   honeyFormat?: 'stable' | 'random'
   /** Hard cap on pairings per scope, bounding memory on long sessions. */
   maxEntriesPerScope?: number
+  /** Persist value-safe substitution records to `~/.dsh/honey-guard/`. */
+  logFile?: boolean
+  /** Roll the substitution log once it exceeds this size, in megabytes. */
+  logFileMaxMb?: number
 }
 
 const LOG_LEVELS = ['silent', 'info', 'debug'] as const
@@ -106,6 +111,11 @@ export const Config: z<Config> = z.object({
   logLevel: z.string().default('info').description('Log verbosity: silent | info | debug'),
   honeyFormat: z.string().default('stable').description('Honey derivation: stable | random'),
   maxEntriesPerScope: z.number().default(500).description('Pairings retained per session'),
+  logFile: z
+    .boolean()
+    .default(false)
+    .description('Persist value-safe substitution records to ~/.dsh/honey-guard/substitutions.jsonl'),
+  logFileMaxMb: z.number().default(5).description('Roll the substitution log past this size (MB)'),
 }) as unknown as z<Config>
 
 /** A settings value that resolves lazily; DSH config fields may be volatile. */
@@ -175,6 +185,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
     },
   })
   const canaries = new CanaryTracker()
+  const subLog =
+    config.logFile === true
+      ? createSubLog({
+          maxBytes: Math.max(1, Number(config.logFileMaxMb) || 5) * 1024 * 1024,
+        })
+      : undefined
 
   /**
    * One mapping scope per agent.
@@ -209,6 +225,7 @@ export function apply(ctx: Context, rawConfig: Config): void {
   const reportSubstitutions = (surface: string, report: SanitizeReport): void => {
     if (report.total === 0) return
     info(`[honey-guard] ${surface}: ${report.total} secret(s) replaced [${formatHits(report.hits)}]`)
+    subLog?.write({ time: new Date().toISOString(), surface, total: report.total, hits: report.hits })
   }
   const warnCanary = (surface: string, hits: CanaryHit[]): void => {
     for (const hit of hits) {
@@ -218,6 +235,13 @@ export function apply(ctx: Context, rawConfig: Config): void {
         `[honey-guard] ${surface}: foreign canary ${hit.canary} (registered in ${hit.sourceScope}) ` +
           `appeared in ${hit.currentScope === undefined ? 'an unscoped pass' : hit.currentScope}`,
       )
+      subLog?.write({
+        time: new Date().toISOString(),
+        surface,
+        canary: hit.canary,
+        sourceScope: hit.sourceScope,
+        currentScope: hit.currentScope,
+      })
     }
   }
 
@@ -334,4 +358,8 @@ export function apply(ctx: Context, rawConfig: Config): void {
   })
 
   info(`[honey-guard] loaded (enabled=${enabled}, logLevel=${logLevel})`)
+  if (subLog !== undefined) {
+    info(`[honey-guard] substitution log: ${subLog.path}`)
+    subLog.write({ time: new Date().toISOString(), surface: 'activate', total: 0, hits: {} })
+  }
 }

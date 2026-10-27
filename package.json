@@ -2,7 +2,7 @@
   "name": "dsh-honey-guard",
   "displayName": "DSH Honey Guard",
   "description": "Zero-Leak Honey-Token Guard for DeepSeek Harness — 双向可还原的蜜罐映射层：出站把本地密钥替换为结构合法且可唯一映射的 Honey-Token，入站再无缝还原为真实值。",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "elegant01",
   "keywords": [
     "dsh-plugin",
