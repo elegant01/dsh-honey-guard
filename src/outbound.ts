@@ -53,6 +53,12 @@ export interface SanitizeReport {
   hits: Partial<Record<HoneyCategory, number>>
   /** Total substitutions. */
   total: number
+  /**
+   * The fake values this pass emitted, deduped, in first-use order. These are
+   * honey tokens, never real values; whether they may leave the process (the
+   * `logHoneys` opt-in) is the caller's decision, not the rewriter's.
+   */
+  honeys?: string[]
 }
 
 /** Rewrites one string, replacing every recognized secret with a fake. */
@@ -145,6 +151,8 @@ export function createTextRewriter(
       replaced += 1
       report.total += 1
       report.hits[interval.category] = (report.hits[interval.category] ?? 0) + 1
+      if (report.honeys === undefined) report.honeys = []
+      if (!report.honeys.includes(interval.honey)) report.honeys.push(interval.honey)
       interval.entry.count += 1
     }
     out += text.slice(cursor)

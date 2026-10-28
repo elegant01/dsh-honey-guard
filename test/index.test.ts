@@ -24,6 +24,7 @@ function createHarness() {
   const provided = new Map<string, unknown>()
   const emitted = new Map<string, unknown[]>()
   const registeredTools: Array<{ name: string }> = []
+  const registeredRoutes: Array<{ kind: string; path: string }> = []
 
   const ctx = {
     on(event: string, handler: AnyHandler) {
@@ -42,6 +43,16 @@ function createHarness() {
     effect(fn: () => unknown, _label?: string) {
       return fn()
     },
+    inject(_services: string[], cb: (serviceCtx: unknown) => void) {
+      // The fake has every service the plugin asks for, so fire immediately.
+      cb(ctx)
+    },
+    webServer: {
+      register(route: { kind: string; path: string }) {
+        registeredRoutes.push(route)
+        return () => {}
+      },
+    },
     tools: {
       register(def: { name: string }) {
         registeredTools.push(def)
@@ -59,7 +70,7 @@ function createHarness() {
     },
   }
 
-  return { ctx: ctx as unknown as Context, handlers, logs, provided, emitted, registeredTools }
+  return { ctx: ctx as unknown as Context, handlers, logs, provided, emitted, registeredTools, registeredRoutes }
 }
 
 function text(value: string): ContentBlock {
@@ -112,13 +123,19 @@ describe('registration', () => {
     const { ctx, registeredTools } = createHarness()
     apply(ctx, {})
     const names = registeredTools.map((t) => t.name).sort()
-    expect(names).toEqual(['honey_mark', 'honey_restore', 'honey_stats'])
+    expect(names).toEqual(['honey_log', 'honey_mark', 'honey_restore', 'honey_stats'])
   })
 
   it('does not register the honey tools when disabled', () => {
     const { ctx, registeredTools } = createHarness()
     apply(ctx, { enabled: false })
     expect(registeredTools.some((t) => t.name.startsWith('honey_'))).toBe(false)
+  })
+
+  it('mounts the settings-card log route on the web server', () => {
+    const { ctx, registeredRoutes } = createHarness()
+    apply(ctx, {})
+    expect(registeredRoutes.some((r) => r.kind === 'exact' && r.path === '/api/honey-guard/log')).toBe(true)
   })
 
   it('publishes a honeyGuard service with the restore surface', () => {

@@ -18,5 +18,5 @@
     "exactOptionalPropertyTypes": false
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": ["lib", "node_modules"]
+  "exclude": ["src/client/**/*", "lib", "node_modules"]
 }

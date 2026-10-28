@@ -51,7 +51,8 @@ import { CanaryTracker, type CanaryHit } from './canary.ts'
 import { sanitizeBlocks, sanitizeMessages, type SanitizeReport } from './outbound.ts'
 import { createTextRestorer, restoreBlocks, restoreMessages, restoreText } from './restore.ts'
 import { registerHoneyTools } from './honey-tools.ts'
-import { createSubLog } from './sub-log.ts'
+import { createSubLog, defaultSubLogPath } from './sub-log.ts'
+import { registerHoneyLogRoute } from './web-log.ts'
 import type { HoneyCategory } from './types.ts'
 import type { RestorationEvent } from './honey-engine.ts'
 
@@ -92,6 +93,12 @@ export interface Config {
   logFile?: boolean
   /** Roll the substitution log once it exceeds this size, in megabytes. */
   logFileMaxMb?: number
+  /**
+   * Also write the emitted honey tokens into the log. These are fake values,
+   * never real ones — but they let anyone holding both the log and a
+   * transcript correlate the two, so this stays opt-in.
+   */
+  logHoneys?: boolean
 }
 
 const LOG_LEVELS = ['silent', 'info', 'debug'] as const
@@ -116,6 +123,10 @@ export const Config: z<Config> = z.object({
     .default(false)
     .description('Persist value-safe substitution records to ~/.dsh/honey-guard/substitutions.jsonl'),
   logFileMaxMb: z.number().default(5).description('Roll the substitution log past this size (MB)'),
+  logHoneys: z
+    .boolean()
+    .default(false)
+    .description('Also log the emitted honey tokens (fake values; enables log↔transcript correlation)'),
 }) as unknown as z<Config>
 
 /** A settings value that resolves lazily; DSH config fields may be volatile. */
@@ -225,7 +236,12 @@ export function apply(ctx: Context, rawConfig: Config): void {
   const reportSubstitutions = (surface: string, report: SanitizeReport): void => {
     if (report.total === 0) return
     info(`[honey-guard] ${surface}: ${report.total} secret(s) replaced [${formatHits(report.hits)}]`)
-    subLog?.write({ time: new Date().toISOString(), surface, total: report.total, hits: report.hits })
+    // Honey tokens leave the process only under the explicit logHoneys opt-in;
+    // the default record stays correlation-free.
+    const honeys = config.logHoneys === true && report.honeys !== undefined && report.honeys.length > 0
+      ? { honeys: report.honeys }
+      : {}
+    subLog?.write({ time: new Date().toISOString(), surface, total: report.total, hits: report.hits, ...honeys })
   }
   const warnCanary = (surface: string, hits: CanaryHit[]): void => {
     for (const hit of hits) {
@@ -335,11 +351,32 @@ export function apply(ctx: Context, rawConfig: Config): void {
   //
   // Lets the user (or a policy caller) hand the guard literal values to treat
   // as sensitive (honey_mark), restore real values on demand (honey_restore),
-  // and read aggregate value-safe statistics (honey_stats). Registered with the
-  // tool registry and cleaned up with the plugin fiber.
+  // read aggregate value-safe statistics (honey_stats), and browse the
+  // substitution log in-session (honey_log). Registered with the tool registry
+  // and cleaned up with the plugin fiber.
   if (enabled) {
-    ctx.effect(() => registerHoneyTools(ctx, { engine, scopeKeyFor, canaries }), 'honey-guard:tools')
+    ctx.effect(
+      () =>
+        registerHoneyTools(ctx, {
+          engine,
+          scopeKeyFor,
+          canaries,
+          subLogPath: subLog?.path ?? defaultSubLogPath(),
+          logFileEnabled: subLog !== undefined,
+        }),
+      'honey-guard:tools',
+    )
   }
+
+  // --- F12: the settings card backend --------------------------------------
+  //
+  // The client bundle (`src/client/`) renders the substitution log on the
+  // plugin's settings card; this route is its data source. No-ops on profiles
+  // without the web server (headless).
+  registerHoneyLogRoute(ctx, {
+    path: subLog?.path ?? defaultSubLogPath(),
+    logFileEnabled: subLog !== undefined,
+  })
 
   // --- Explicit restore surface -------------------------------------------
   //
