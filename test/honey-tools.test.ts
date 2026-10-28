@@ -261,7 +261,7 @@ describe('honey_stats', () => {
 })
 
 describe('registerHoneyTools', () => {
-  it('registers all three tools and disposes them together', () => {
+  it('registers all four tools and disposes them together', () => {
     const registered: Array<{ name: string }> = []
     const ctx = {
       tools: {
@@ -278,7 +278,7 @@ describe('registerHoneyTools', () => {
       engine: new HoneyEngine(),
       scopeKeyFor: () => undefined,
     })
-    expect(registered.map((t) => t.name).sort()).toEqual(['honey_mark', 'honey_restore', 'honey_stats'])
+    expect(registered.map((t) => t.name).sort()).toEqual(['honey_log', 'honey_mark', 'honey_restore', 'honey_stats'])
 
     dispose()
     expect(registered).toHaveLength(0)

@@ -27,6 +27,13 @@ export interface SubLogRecord {
   total?: number
   /** Per-category counts; absent on canary records. */
   hits?: Partial<Record<string, number>>
+  /**
+   * The fake values the pass emitted, present only when the operator opted in
+   * with `logHoneys`. Honey tokens are fake by construction — but they make
+   * log↔transcript correlation possible, which is exactly why the default
+   * keeps them out.
+   */
+  honeys?: string[]
   /** Foreign canary id, present only on leak records. */
   canary?: string
   /** Scope that armed the canary. */

@@ -1,5 +1,6 @@
 /**
- * The honey-guard tool group: `honey_mark`, `honey_restore`, `honey_stats`.
+ * The honey-guard tool group: `honey_mark`, `honey_restore`, `honey_stats`,
+ * `honey_log`.
  *
  * DSH has no slash-command registry, so the guard's operator surface is a set
  * of model-callable tools. The user asks in natural language ("把 X 标记为敏
@@ -27,9 +28,10 @@ import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { HoneyEngine } from './honey-engine.ts'
 import type { CanaryTracker } from './canary.ts'
 import type { HoneyCategory } from './types.ts'
+import { createHoneyLogTool, type HoneyLogDeps } from './honey-log.ts'
 
 /** Dependency surface the tools need from the plugin activation. */
-export interface HoneyToolsDeps {
+export interface HoneyToolsDeps extends HoneyLogDeps {
   /** The mapping engine (the same instance that sanitizes outbound). */
   engine: HoneyEngine
   /** Resolve the mapping scope for an agent handle. */
@@ -261,6 +263,7 @@ export function registerHoneyTools(ctx: ToolsRegistry, deps: HoneyToolsDeps): ()
     ctx.tools.register(createHoneyMarkTool(deps)),
     ctx.tools.register(createHoneyRestoreTool(deps)),
     ctx.tools.register(createHoneyStatsTool(deps)),
+    ctx.tools.register(createHoneyLogTool(deps)),
   ]
   return () => {
     for (const dispose of disposers) dispose()
